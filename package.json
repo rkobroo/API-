@@ -13,14 +13,14 @@
     "content-disposition": "^0.5.3",
     "execa": "^5.1.1",
     "ffmpeg-static": "^4.2.7",
-    "next": "^11.0.0",
+    "next": "^15.4.1",
     "next-absolute-url": "^1.2.2",
     "node-fetch": "^2.6.1",
     "nprogress": "^0.2.0",
     "pretty-ms": "^7.0.1",
     "query-string": "^7.0.0",
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-scrollbars-custom": "^4.0.25"
   },
   "devDependencies": {
@@ -31,7 +31,7 @@
     "eslint-plugin-prettier": "^3.4.0",
     "postcss": "^8.3.5",
     "postcss-flexbugs-fixes": "5.0.2",
-    "postcss-preset-env": "^6.7.0",
+    "postcss-preset-env": "^10.2.4",
     "prettier": "^2.1.2",
     "tailwindcss": "^2.2.2"
   },
