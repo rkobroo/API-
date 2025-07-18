@@ -1,17 +1,17 @@
 {
-	"version": 2,
-	"routes": [
-		{
-			"src": "/api/download",
-			"dest": "api/download.js"
-		},
-		{
-			"src": "/api/info",
-			"dest": "api/ytdl.py"
-		},
-		{
-			"src": "/api/version",
-			"dest": "api/ytdl.py"
-		}
-	]
+  "builds": [
+    {
+      "src": "pages/result/index.js",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "pages/api/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "functions": {
+    "api/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  }
 }
