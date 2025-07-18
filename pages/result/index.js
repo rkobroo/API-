@@ -40,12 +40,18 @@ export default function Result({ data, error, statusCode, origin }) {
 export async function getServerSideProps({ req, query }) {
   const { origin } = absoluteUrl(req);
   const props = { data: null, error: null, origin, statusCode: 200 };
-  const res = await fetch(`${origin}/api/info?${queryString.stringify(query)}`);
-  if (res.status === 200) {
-    props.data = await res.json();
-  } else {
-    props.statusCode = 400;
-    props.error = await res.text();
+  try {
+    const res = await fetch(`${origin}/api/info?${queryString.stringify(query)}`);
+    if (res.status === 200) {
+      props.data = await res.json();
+    } else {
+      props.statusCode = res.status;
+      props.error = await res.text();
+    }
+  } catch (error) {
+    props.statusCode = 500;
+    props.error = 'Failed to fetch data from API';
+    console.error('Fetch error:', error);
   }
   return { props };
 }
