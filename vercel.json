@@ -1,17 +1,29 @@
 {
+  "version": 2,
   "builds": [
     {
       "src": "pages/result/index.js",
       "use": "@vercel/next"
     },
     {
-      "src": "pages/api/*.js",
-      "use": "@vercel/node"
+      "src": "api/ytdlp.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/info",
+      "dest": "api/ytdlp.py"
+    },
+    {
+      "src": "/api/version",
+      "dest": "api/ytdlp.py"
     }
   ],
   "functions": {
-    "api/*.js": {
-      "runtime": "nodejs18.x"
+    "api/ytdlp.py": {
+      "runtime": "python3.9",
+      "timeoutSeconds": 60 // Increase to 60 seconds
     }
   }
 }
