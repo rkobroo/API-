@@ -1,11 +1,11 @@
 import ytdl from 'ytdl-core';
 
 export default async function handler(req, res) {
-  const { url } = req.query;
-  if (!url) return res.status(400).json({ error: 'URL is required' });
+  const { q } = req.query; // Use 'q' for query parameter
+  if (!q) return res.status(400).json({ error: 'Query parameter "q" is required' });
 
   try {
-    const info = await ytdl.getBasicInfo(url, { quality: 'lowest' }); // Fetch basic info only
+    const info = await ytdl.getBasicInfo(q, { quality: 'lowest' }); // Fetch basic info only
     res.status(200).json({
       title: info.videoDetails.title,
       uploader: info.videoDetails.author.name,
