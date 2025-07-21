@@ -12,6 +12,29 @@ export default function IndexPage({ origin }) {
   const [iFocused, setIFocused] = useState(false);
   const [bFocused, setBFocused] = useState(false);
   const [formData, setFormData] = useState(INIT_FORM);
+  const [error, setError] = useState(null); // Add error state
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null); // Clear previous errors
+    try {
+      // Optionally validate the query (e.g., check if it looks like a URL)
+      if (!formData.query.trim()) {
+        setError("Please enter a valid URL or search query");
+        return;
+      }
+
+      // Redirect to /result with query params
+      await router.push({
+        pathname: "/result",
+        query: { f: formData.format, q: formData.query },
+      });
+    } catch (err) {
+      console.error("Navigation error:", err);
+      setError("Failed to process the request. Please try again.");
+    }
+  };
+
   return (
     <div className="flex flex-col self-center w-full my-auto text-white">
       <div
@@ -64,13 +87,7 @@ export default function IndexPage({ origin }) {
         </div>
       </div>
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          router.push({
-            pathname: "/result",
-            query: { f: formData.format, q: formData.query },
-          });
-        }}
+        onSubmit={handleSubmit}
         method="GET"
         action="/result"
         className={`w-full px-4 transition duration-150 ease-in-out transform ${
@@ -78,9 +95,7 @@ export default function IndexPage({ origin }) {
         }`}
       >
         <input
-          style={{
-            caretColor: "white",
-          }}
+          style={{ caretColor: "white" }}
           onFocus={() => setIFocused(true)}
           onBlur={(e) => {
             if (!bFocused) {
@@ -91,13 +106,14 @@ export default function IndexPage({ origin }) {
           onChange={(e) => setFormData({ ...formData, query: e.target.value })}
           type="text"
           name="q"
-          className={` w-full text-xl xl:text-5xl placeholder-current bg-transparent appearance-none ${
+          className={`w-full text-xl xl:text-5xl placeholder-current bg-transparent appearance-none ${
             iFocused ? "text-shine" : "text-shine-mono"
           }`}
           placeholder="click here to enter url or search query"
           autoComplete="off"
           value={formData.query}
         />
+        {error && <p className="text-red-500 text-sm">{error}</p>} {/* Display error message */}
         <div
           className={`flex flex-col items-start w-full appearance-none transition ease-in-out delay-150 duration-300 font-bold ${
             iFocused && formData.query
@@ -113,9 +129,7 @@ export default function IndexPage({ origin }) {
               onChange={(e) =>
                 setFormData({ ...formData, format: e.target.value })
               }
-              style={{
-                caretColor: "white",
-              }}
+              style={{ caretColor: "white" }}
               type="text"
               name="f"
               className="w-64 text-sm bg-transparent outline-none opacity-50 appearance-none"
