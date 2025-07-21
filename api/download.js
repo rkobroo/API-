@@ -7,7 +7,7 @@ import queryString from "query-string";
 
 const handler = async (req, res) => {
   const {
-    query: { url, f = "bestvideo+bestaudio/best" }, // Default format if not provided
+    query: { url, f = "bestvideo+bestaudio/best" },
   } = req;
 
   if (!url || typeof url !== "string") {
@@ -16,16 +16,19 @@ const handler = async (req, res) => {
 
   try {
     const { origin } = absoluteUrl(req);
+    console.log(`Fetching info from: ${origin}/api/info?${queryString.stringify({ f, q: url })}`);
     const data = await fetch(
       `${origin}/api/info?${queryString.stringify({ f, q: url })}`
     );
 
     if (data.status !== 200) {
       const errorText = await data.text();
+      console.error(`Info endpoint failed: ${errorText}`);
       return res.status(400).send(`Info fetch failed: ${errorText}`);
     }
 
     const info = await data.json();
+    console.log("Info response:", JSON.stringify(info));
 
     if (!info || typeof info !== "object") {
       return res.status(400).send("Invalid response from info endpoint");
@@ -40,11 +43,12 @@ const handler = async (req, res) => {
       return res.status(400).send("Only video, no audio is not supported");
     }
 
-    const ffmpegArgs = ["-i", info.url || (info.requested_formats && info.requested_formats[0]?.url)];
-    if (!ffmpegArgs[1]) {
+    const inputUrl = info.url || (info.requested_formats && info.requested_formats[0]?.url);
+    if (!inputUrl) {
       return res.status(400).send("No valid input URL found in info response");
     }
 
+    const ffmpegArgs = ["-i", inputUrl];
     if (audioOnly) {
       res.setHeader("Content-Type", "audio/mpeg3");
       ffmpegArgs.push("-acodec", "libmp3lame", "-f", "mp3");
@@ -71,18 +75,19 @@ const handler = async (req, res) => {
     );
 
     ffmpegArgs.push("-");
+    console.log("FFmpeg args:", ffmpegArgs);
     const ffSp = execa(pathToFfmpeg, ffmpegArgs, { stdio: ["pipe", "pipe", "pipe"] });
     ffSp.stdout.pipe(res);
 
-    // Handle process errors
     ffSp.on("error", (err) => {
+      console.error("FFmpeg execution error:", err.message);
       res.status(500).send(`FFmpeg error: ${err.message}`);
     });
 
     await ffSp;
   } catch (error) {
-    console.error("Download error:", error); // Log error for debugging
-    return res.status(400).send(`Processing failed: ${error.message || error.stderr || "Unknown error"}`);
+    console.error("Handler error:", error.message, error.stack);
+    return res.status(500).send(`Processing failed: ${error.message || "Unknown error"}`);
   }
 };
 
