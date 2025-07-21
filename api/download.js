@@ -10,8 +10,10 @@ const handler = async (req, res) => {
     query: { url, f = "bestvideo+bestaudio/best" },
   } = req;
 
-  if (!url || typeof url !== "string") {
-    return res.status(400).send("URL parameter is required and must be a string");
+  // Validate URL parameter
+  if (!url || typeof url !== "string" || url.trim() === "") {
+    console.error("Invalid or missing URL parameter:", url);
+    return res.status(400).send("URL parameter is required and cannot be empty");
   }
 
   try {
