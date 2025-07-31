@@ -16,16 +16,24 @@ const handler = async (req, res) => {
     return res.status(400).send("URL parameter is required and cannot be empty");
   }
 
+  let responded = false;
+  let ffSp = null;
+
+  // Clean up FFmpeg if client disconnects
+  res.on("close", () => {
+    if (ffSp && ffSp.kill) ffSp.kill("SIGKILL");
+  });
+
   try {
     const { origin } = absoluteUrl(req);
-    console.log(`Fetching info from: ${origin}/api/info?${queryString.stringify({ f, q: url })}`);
-    const data = await fetch(
-      `${origin}/api/info?${queryString.stringify({ f, q: url })}`
-    );
+    const infoUrl = `${origin}/api/info?${queryString.stringify({ f, q: url })}`;
+    console.log(`Fetching info from: ${infoUrl}`);
+    const data = await fetch(infoUrl);
 
     if (data.status !== 200) {
       const errorText = await data.text();
       console.error(`Info endpoint failed: ${errorText}`);
+      responded = true;
       return res.status(400).send(`Info fetch failed: ${errorText}`);
     }
 
@@ -33,20 +41,24 @@ const handler = async (req, res) => {
     console.log("Info response:", JSON.stringify(info));
 
     if (!info || typeof info !== "object") {
+      responded = true;
       return res.status(400).send("Invalid response from info endpoint");
     }
 
     if (info.entries) {
+      responded = true;
       return res.status(400).send("This endpoint does not support playlists");
     }
 
     const audioOnly = info.acodec !== "none" && info.vcodec === "none";
     if (info.acodec === "none" && info.vcodec !== "none") {
+      responded = true;
       return res.status(400).send("Only video, no audio is not supported");
     }
 
-    const inputUrl = info.url || (info.requested_formats && info.requested_formats[0]?.url);
+    const inputUrl = info.url || (Array.isArray(info.requested_formats) && info.requested_formats[0]?.url);
     if (!inputUrl) {
+      responded = true;
       return res.status(400).send("No valid input URL found in info response");
     }
 
@@ -56,18 +68,14 @@ const handler = async (req, res) => {
       ffmpegArgs.push("-acodec", "libmp3lame", "-f", "mp3");
     } else {
       res.setHeader("Content-Type", "video/mp4");
-      if (info.requested_formats && info.requested_formats.length > 1) {
+      if (Array.isArray(info.requested_formats) && info.requested_formats.length > 1) {
         ffmpegArgs.push("-i", info.requested_formats[1].url);
       }
       ffmpegArgs.push(
-        "-c:v",
-        "libx264",
-        "-acodec",
-        "aac",
-        "-movflags",
-        "frag_keyframe+empty_moov",
-        "-f",
-        "mp4"
+        "-c:v", "libx264",
+        "-acodec", "aac",
+        "-movflags", "frag_keyframe+empty_moov",
+        "-f", "mp4"
       );
     }
 
@@ -78,18 +86,26 @@ const handler = async (req, res) => {
 
     ffmpegArgs.push("-");
     console.log("FFmpeg args:", ffmpegArgs);
-    const ffSp = execa(pathToFfmpeg, ffmpegArgs, { stdio: ["pipe", "pipe", "pipe"] });
+    ffSp = execa(pathToFfmpeg, ffmpegArgs, { stdio: ["pipe", "pipe", "pipe"] });
     ffSp.stdout.pipe(res);
 
     ffSp.on("error", (err) => {
-      console.error("FFmpeg execution error:", err.message);
-      res.status(500).send(`FFmpeg error: ${err.message}`);
+      if (!responded) {
+        responded = true;
+        console.error("FFmpeg execution error:", err.message);
+        if (!res.headersSent)
+          res.status(500).send(`FFmpeg error: ${err.message}`);
+      }
     });
 
     await ffSp;
   } catch (error) {
-    console.error("Handler error:", error.message, error.stack);
-    return res.status(500).send(`Processing failed: ${error.message || "Unknown error"}`);
+    if (!responded) {
+      responded = true;
+      console.error("Handler error:", error.message, error.stack);
+      if (!res.headersSent)
+        return res.status(500).send(`Processing failed: ${error.message || "Unknown error"}`);
+    }
   }
 };
 
