@@ -1,14 +1,15 @@
 import os
 import subprocess
+import urllib.parse
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from yt_dlp import YoutubeDL
 from imageio_ffmpeg import get_ffmpeg_exe
 
 app = FastAPI(title="YouTube Downloader API", description="yt-dlp API")
 
-# Allow all origins — change to specific domain if you want security
+# Enable CORS for browser access (open to all)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,19 +18,63 @@ app.add_middleware(
 )
 
 # -------------------------
-# Root Welcome Page
+# Web Preview UI
 # -------------------------
-@app.get("/")
-def root():
-    return {
-        "message": "Welcome to the YouTube Downloader API 🎬",
-        "docs": "/docs",
-        "endpoints": {
-            "health": "/health",
-            "info": "/info?q=<YouTube URL>",
-            "download": "/download?url=<YouTube URL>&f=bestvideo+bestaudio/best"
-        }
-    }
+@app.get("/", response_class=HTMLResponse)
+def home():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>YouTube Downloader API Test</title>
+        <style>
+            body { font-family: Arial; max-width: 700px; margin:auto; padding:20px; }
+            input[type=text] { width:100%; padding:10px; margin:10px 0; }
+            button { padding:10px 15px; margin-top:10px; cursor:pointer;}
+            pre { background:#f4f4f4; padding:10px; white-space: pre-wrap; word-wrap: break-word; }
+            a.download-btn { display:inline-block; padding:8px 12px; background:#28a745; color:white; text-decoration:none; border-radius:4px; margin:5px 5px 0 0;}
+            a.download-audio { background:#007bff; }
+        </style>
+    </head>
+    <body>
+        <h1>🎬 YouTube Downloader API</h1>
+        <form id="infoForm">
+            <label>Video URL:</label>
+            <input type="text" id="yturl" placeholder="https://www.youtube.com/watch?v=xxxxx" required>
+            <button type="submit">Get Info</button>
+        </form>
+        <div id="infoOutput"></div>
+
+        <script>
+            document.getElementById('infoForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                let url = document.getElementById('yturl').value.trim();
+                if(!url) return;
+                document.getElementById('infoOutput').innerHTML = '<p>Loading...</p>';
+
+                try {
+                    const resp = await fetch('/info?q=' + encodeURIComponent(url));
+                    const data = await resp.json();
+                    let html = '';
+
+                    if(data.detail){
+                        html = '<p style="color:red;">Error: ' + data.detail + '</p>';
+                    } else {
+                        html += '<h2>Video Info</h2><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                        if(data.webpage_url){
+                            html += '<a class="download-btn" target="_blank" href="/download?url=' + encodeURIComponent(url) + '">⬇ Download Video</a>';
+                            html += '<a class="download-btn download-audio" target="_blank" href="/download?url=' + encodeURIComponent(url) + '&f=bestaudio">🎧 Download Audio</a>';
+                        }
+                    }
+                    document.getElementById('infoOutput').innerHTML = html;
+                } catch(err){
+                    document.getElementById('infoOutput').innerHTML = '<p style="color:red;">Fetch failed: ' + err + '</p>';
+                }
+            });
+        </script>
+    </body>
+    </html>
+    """
 
 # -------------------------
 # Health Check
@@ -39,12 +84,12 @@ def health():
     return {"ok": True}
 
 # -------------------------
-# Info Endpoint (replacement for info.js)
+# Info Endpoint
 # -------------------------
 @app.get("/info")
 def get_video_info(q: str = Query(..., description="YouTube video URL")):
     if not q or not isinstance(q, str):
-        raise HTTPException(status_code=400, detail='Parameter "q" is required and must be a string.')
+        raise HTTPException(status_code=400, detail='Parameter "q" must be a valid YouTube URL.')
 
     ydl_opts = {
         'quiet': True,
@@ -77,7 +122,7 @@ def get_video_info(q: str = Query(..., description="YouTube video URL")):
         raise HTTPException(status_code=500, detail=f"Failed to fetch video info: {str(e)}")
 
 # -------------------------
-# Download Endpoint (replacement for download.js)
+# Download Endpoint
 # -------------------------
 @app.get("/download")
 def download_video(
@@ -115,7 +160,7 @@ def download_video(
     ffmpeg_args = ["-i", input_url]
 
     filename = f"{info.get('title', 'download').replace('/', '_')}"
-    if audio_only:
+    if audio_only or f == "bestaudio":
         content_type = "audio/mpeg"
         filename += ".mp3"
         ffmpeg_args += ["-acodec", "libmp3lame", "-f", "mp3"]
